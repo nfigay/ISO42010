@@ -1,12 +1,14 @@
 name: Validate XML baseline
 on:
   push:
+    branches: [main]
     paths:
       - 'schemas/**'
       - 'examples/**'
       - 'tests/**'
       - '.github/workflows/validate-xml.yml'
   pull_request:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
