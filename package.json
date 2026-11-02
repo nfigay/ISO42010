@@ -10,7 +10,9 @@
     "build:modules": "vite build --mode modules",
     "build:pages": "vite build --mode pages",
     "build": "node scripts/build-targets.mjs",
-    "preview": "vite preview --mode server --host 127.0.0.1 --port 4173 --strictPort"
+    "preview": "vite preview --mode server --host 127.0.0.1 --port 4173 --strictPort",
+    "publication:check": "node scripts/prepare-publication.mjs",
+    "publication:deploy": "node scripts/prepare-publication.mjs --publish"
   },
   "devDependencies": {
     "vite": "^8.2.2",
