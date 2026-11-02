@@ -13739,10 +13739,10 @@ body > main {flex:1 1 auto;min-height:0;position:relative;overflow:hidden;}
 
       if (type === "ArchitectureView") {
         const opts = state.models.map(m => `<option value="${m.id}" ${item.containedModelRefs?.includes(m.id) ? 'selected' : ''}>${m.name} (${m.id})</option>`).join("");
-        container.innerHTML = `<label class="block text-slate-400 mb-1">Contained Models (IDREFS Multi-select)</label><select id="rel-contained-models" multiple class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-slate-200 h-24">${opts}</select>`;
+        container.innerHTML = `<label class="block text-slate-400 mb-1">Contained Models (IDREFS Multi-select)</label><select id="rel-contained-models" multiple class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-slate-200 h-24">${opts}</select><p class="text-slate-400 mt-1">Maintenir Cmd (Mac) ou Ctrl pour sélectionner/désélectionner plusieurs modèles. Valider avec Save.</p>`;
       } else if (type === "ArchitectureViewpoint") {
         const opts = state.concerns.map(c => `<option value="${c.id}" ${item.framedConcernRefs?.includes(c.id) ? 'selected' : ''}>${c.name} (${c.id})</option>`).join("");
-        container.innerHTML = `<label class="block text-slate-400 mb-1">Framed Concerns (IDREFS Multi-select)</label><select id="rel-framed-concerns" multiple class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-slate-200 h-24">${opts}</select>`;
+        container.innerHTML = `<label class="block text-slate-400 mb-1">Framed Concerns (IDREFS Multi-select)</label><select id="rel-framed-concerns" multiple class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-slate-200 h-24">${opts}</select><p class="text-slate-400 mt-1">Maintenir Cmd (Mac) ou Ctrl pour sélectionner/désélectionner plusieurs préoccupations. Valider avec Save.</p>`;
       } else if (type === "ArchitectureModel") {
         const mkOpts = state.modelKinds.map(mk => `<option value="${mk.id}">${mk.name}</option>`).join("");
         container.innerHTML = `
@@ -13927,11 +13927,18 @@ body > main {flex:1 1 auto;min-height:0;position:relative;overflow:hidden;}
         const name = document.getElementById("input-name").value;
         const desc = document.getElementById("input-desc").value;
 
+        // Capturer les relations AVANT de réinitialiser le formulaire ou le graphe.
+        const selectedRefs = (selector) => Array.from(
+          document.querySelector(selector)?.selectedOptions || [], option => option.value
+        );
+        const containedModelRefs = selectedRefs("#rel-contained-models");
+        const framedConcernRefs = selectedRefs("#rel-framed-concerns");
+
         if (!isEdit) {
           if (type === "Stakeholder") state.stakeholders.push({ id, name, role: desc });
           if (type === "Concern") state.concerns.push({ id, name, holderStakeholderRefs: [] });
-          if (type === "ArchitectureViewpoint") state.viewpoints.push({ id, name, framedConcernRefs: [], usedModelKindRefs: [] });
-          if (type === "ArchitectureView") state.views.push({ id, name, governedByViewpointRef: "", containedModelRefs: [] });
+          if (type === "ArchitectureViewpoint") state.viewpoints.push({ id, name, framedConcernRefs, usedModelKindRefs: [] });
+          if (type === "ArchitectureView") state.views.push({ id, name, governedByViewpointRef: "", containedModelRefs });
           if (type === "ArchitectureModel") {
             const uri = document.getElementById("rel-artifact-uri")?.value || desc || "process.bpmn";
             state.models.push({ id, name, governedByModelKindRef: "MK_BPMN20", artifactURI: uri });
@@ -13946,15 +13953,13 @@ body > main {flex:1 1 auto;min-height:0;position:relative;overflow:hidden;}
             const view = state.views.find(v => v.id === id);
             if (view) {
               view.name = name;
-              const select = document.getElementById("rel-contained-models");
-              view.containedModelRefs = Array.from(select.selectedOptions).map(o => o.value);
+              view.containedModelRefs = containedModelRefs;
             }
           } else if (type === "ArchitectureViewpoint") {
             const vp = state.viewpoints.find(v => v.id === id);
             if (vp) {
               vp.name = name;
-              const select = document.getElementById("rel-framed-concerns");
-              vp.framedConcernRefs = Array.from(select.selectedOptions).map(o => o.value);
+              vp.framedConcernRefs = framedConcernRefs;
             }
           }
         }
