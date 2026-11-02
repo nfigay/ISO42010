@@ -13441,12 +13441,15 @@ body > main {flex:1 1 auto;min-height:0;position:relative;overflow:hidden;}
     }
 
 
+    // Persistence implementation is shared by source and published ESM modules.
+    // Loading is asynchronous, completed before the workbench renders.
+    let workspaceRepository = null;
+    async function loadWorkspaceRepository() {
+      if (!workspaceRepository) workspaceRepository = await import('./modules/storage/workspace-repository.js');
+      return workspaceRepository;
+    }
     function isValidArchitecture(candidate) {
-      return candidate && typeof candidate === 'object' &&
-        candidate.systemOfInterest && typeof candidate.systemOfInterest.id === 'string' &&
-        Array.isArray(candidate.models) && candidate.models.length > 0 &&
-        ['stakeholders', 'concerns', 'viewpoints', 'views', 'correspondences']
-          .every(key => Array.isArray(candidate[key]));
+      return workspaceRepository.isValidArchitecture(candidate);
     }
 
     function showStorageProblem(error) {
@@ -13464,81 +13467,27 @@ body > main {flex:1 1 auto;min-height:0;position:relative;overflow:hidden;}
     }
 
     function openWorkspaceDb() {
-      return new Promise((resolve, reject) => {
-        let request;
-        try { request = indexedDB.open(WORKSPACE_DB, 1); }
-        catch (error) { reject(error); return; }
-        request.onupgradeneeded = () => {
-          const db = request.result;
-          if (!db.objectStoreNames.contains('workspaces'))
-            db.createObjectStore('workspaces', { keyPath: 'id' });
-          if (!db.objectStoreNames.contains('settings'))
-            db.createObjectStore('settings', { keyPath: 'key' });
-        };
-        request.onsuccess = () => {
-          const db = request.result;
-          db.onversionchange = () => { db.close(); workspaceDb = null; };
-          resolve(db);
-        };
-        request.onerror = () => reject(request.error || new Error('Ouverture IndexedDB refusée'));
-        request.onblocked = () => reject(new Error('Ouverture IndexedDB bloquée par un autre onglet'));
-      });
+      return workspaceRepository.openWorkspaceDb(WORKSPACE_DB, () => { workspaceDb = null; });
     }
 
     function readWorkspace(db) {
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction('workspaces', 'readonly');
-        const request = tx.objectStore('workspaces').get(WORKSPACE_ID);
-        let result;
-        request.onsuccess = () => { result = request.result; };
-        tx.oncomplete = () => resolve(result || null);
-        tx.onerror = () => reject(tx.error || new Error('Lecture IndexedDB échouée'));
-        tx.onabort = () => reject(tx.error || new Error('Lecture IndexedDB annulée'));
-      });
+      return workspaceRepository.readWorkspace(db, WORKSPACE_ID);
     }
 
     function writeWorkspace(db, snapshot, expectedRevision = null) {
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction('workspaces', 'readwrite');
-        const store = tx.objectStore('workspaces');
-        const get = store.get(WORKSPACE_ID);
-        let nextRevision = 0;
-        let conflict = null;
-        get.onsuccess = () => {
-          const current = get.result;
-          const revision = Number(current?.revision || 0);
-          if (expectedRevision !== null && revision !== expectedRevision) {
-            conflict = new Error('Conflit : une autre vue a modifié le modèle. Annulez le formulaire, puis rechargez. Aucune écriture effectuée.');
-            tx.abort();
-            return;
-          }
-          nextRevision = revision + 1;
-          store.put({ id: WORKSPACE_ID, schemaVersion: 1,
-            revision: nextRevision, updatedAt: new Date().toISOString(), data: snapshot });
-        };
-        tx.oncomplete = () => resolve(nextRevision);
-        tx.onerror = () => reject(conflict || tx.error || new Error('Écriture IndexedDB échouée'));
-        tx.onabort = () => reject(conflict || tx.error || new Error('Écriture IndexedDB annulée'));
-      });
+      return workspaceRepository.writeWorkspace(db, snapshot, expectedRevision, WORKSPACE_ID);
     }
 
     function readLegacyState() {
-      try {
-        const serialized = localStorage.getItem(STORAGE_KEY);
-        if (!serialized) return null;
-        const candidate = JSON.parse(serialized);
-        if (!isValidArchitecture(candidate)) {
-          console.warn('[ISO42010] État localStorage ancien invalide, conservé sans modification');
-          return null;
-        }
-        return candidate;
-      } catch (error) {
-        console.warn('[ISO42010] Ancienne sauvegarde illisible, conservée', error);
-        return null;
-      }
+      return workspaceRepository.readLegacyState(localStorage, STORAGE_KEY);
     }
 
     async function loadState() {
+      try { await loadWorkspaceRepository(); }
+      catch (error) {
+        console.error('[ISO42010] Module de persistance indisponible', error);
+        throw error;
+      }
       const legacy = readLegacyState();
       try {
         if (typeof indexedDB === 'undefined') throw new Error('API IndexedDB absente');
