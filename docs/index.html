@@ -13345,6 +13345,88 @@ body > main {flex:1 1 auto;min-height:0;position:relative;overflow:hidden;}
     let storageMode = 'initializing';
     let saveQueue = Promise.resolve();
     let storageErrorNotified = false;
+    // Révision globale de l'espace, vérifiée dans la transaction d'écriture.
+    let workspaceRevision = 0;
+    let pendingSaves = 0;
+    let externalChangePending = false;
+    let syncChannel = null;
+    let reconcileRunning = false;
+    const syncOrigin = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random();
+
+    function editorIsOpen() {
+      const editor = document.getElementById('modal-editor');
+      return editor && !editor.classList.contains('hidden');
+    }
+
+    function showRemoteChangeNotice() {
+      let el = document.getElementById('iso42010-sync-notice');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'iso42010-sync-notice';
+        el.style.cssText = 'position:fixed;top:12px;right:12px;z-index:99999;background:#7f1d1d;color:white;padding:12px 16px;border-radius:8px;max-width:380px;box-shadow:0 4px 20px #0008;font:14px sans-serif';
+        el.setAttribute('role', 'alert');
+        document.body.appendChild(el);
+      }
+      el.textContent = 'Modifications détectées dans un autre onglet. Terminez ou annulez votre formulaire, puis rechargez les données avant de modifier.';
+      el.style.display = 'block';
+    }
+
+    function clearRemoteChangeNotice() {
+      const el = document.getElementById('iso42010-sync-notice');
+      if (el) el.style.display = 'none';
+    }
+
+    async function reconcileWorkspace() {
+      if (reconcileRunning || storageMode !== 'indexeddb' || !workspaceDb) return;
+      if (pendingSaves || editorIsOpen()) {
+        // Ne jamais écraser un formulaire ouvert ou une écriture locale en attente.
+        externalChangePending = true;
+        showRemoteChangeNotice();
+        return;
+      }
+      reconcileRunning = true;
+      try {
+        const record = await readWorkspace(workspaceDb);
+        if (!record || record.schemaVersion !== 1 || !isValidArchitecture(record.data))
+          throw new Error('Données distantes incompatibles');
+        const revision = Number(record.revision || 0);
+        if (revision !== workspaceRevision) {
+          state = record.data;
+          workspaceRevision = revision;
+          refreshUI();
+          console.info('[ISO42010 sync] Vue actualisée depuis IndexedDB, révision', revision);
+        }
+        externalChangePending = false;
+        clearRemoteChangeNotice();
+      } catch (error) {
+        showStorageProblem(error);
+      } finally {
+        reconcileRunning = false;
+      }
+    }
+
+    function setupWorkspaceSync() {
+      if (typeof BroadcastChannel !== 'undefined') {
+        syncChannel = new BroadcastChannel('ISO42010_Workspace_Sync_v1');
+        syncChannel.onmessage = event => {
+          const msg = event.data;
+          if (msg?.workspaceId === WORKSPACE_ID && msg?.sender !== syncOrigin && msg?.type === 'committed')
+            void reconcileWorkspace();
+        };
+      }
+      // Rattrape une notification manquée (onglet suspendu ou navigateur sans BroadcastChannel).
+      window.addEventListener('focus', () => { void reconcileWorkspace(); });
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) void reconcileWorkspace();
+      });
+      ['modal-close','modal-cancel'].forEach(id => {
+        document.getElementById(id)?.addEventListener('click', () => {
+          // Le gestionnaire original masque le formulaire pendant cet événement.
+          queueMicrotask(() => { if (externalChangePending) void reconcileWorkspace(); });
+        });
+      });
+    }
+
 
     function isValidArchitecture(candidate) {
       return candidate && typeof candidate === 'object' &&
@@ -13402,18 +13484,28 @@ body > main {flex:1 1 auto;min-height:0;position:relative;overflow:hidden;}
       });
     }
 
-    function writeWorkspace(db, snapshot) {
+    function writeWorkspace(db, snapshot, expectedRevision = null) {
       return new Promise((resolve, reject) => {
         const tx = db.transaction('workspaces', 'readwrite');
-        tx.objectStore('workspaces').put({
-          id: WORKSPACE_ID,
-          schemaVersion: 1,
-          updatedAt: new Date().toISOString(),
-          data: snapshot
-        });
-        tx.oncomplete = resolve;
-        tx.onerror = () => reject(tx.error || new Error('Écriture IndexedDB échouée'));
-        tx.onabort = () => reject(tx.error || new Error('Écriture IndexedDB annulée'));
+        const store = tx.objectStore('workspaces');
+        const get = store.get(WORKSPACE_ID);
+        let nextRevision = 0;
+        let conflict = null;
+        get.onsuccess = () => {
+          const current = get.result;
+          const revision = Number(current?.revision || 0);
+          if (expectedRevision !== null && revision !== expectedRevision) {
+            conflict = new Error('Conflit : une autre vue a modifié le modèle. Annulez le formulaire, puis rechargez. Aucune écriture effectuée.');
+            tx.abort();
+            return;
+          }
+          nextRevision = revision + 1;
+          store.put({ id: WORKSPACE_ID, schemaVersion: 1,
+            revision: nextRevision, updatedAt: new Date().toISOString(), data: snapshot });
+        };
+        tx.oncomplete = () => resolve(nextRevision);
+        tx.onerror = () => reject(conflict || tx.error || new Error('Écriture IndexedDB échouée'));
+        tx.onabort = () => reject(conflict || tx.error || new Error('Écriture IndexedDB annulée'));
       });
     }
 
@@ -13443,11 +13535,12 @@ body > main {flex:1 1 auto;min-height:0;position:relative;overflow:hidden;}
           if (existing.schemaVersion !== 1 || !isValidArchitecture(existing.data))
             throw new Error('Espace IndexedDB incompatible ou endommagé : aucune écriture automatique');
           state = existing.data;
+          workspaceRevision = Number(existing.revision || 0);
           storageMode = 'indexeddb';
           console.info('[ISO42010] Espace existant chargé depuis IndexedDB');
         } else {
           state = legacy || JSON.parse(JSON.stringify(DEFAULT_MODEL));
-          await writeWorkspace(workspaceDb, structuredClone(state));
+          workspaceRevision = await writeWorkspace(workspaceDb, structuredClone(state), 0);
           storageMode = 'indexeddb';
           console.info('[ISO42010] Initialisé dans IndexedDB', legacy ? 'depuis localStorage' : 'depuis le modèle par défaut');
         }
@@ -13464,20 +13557,31 @@ body > main {flex:1 1 auto;min-height:0;position:relative;overflow:hidden;}
     }
 
     function saveState() {
-      // Le rendu suit immédiatement la modification en mémoire.
+      // Le modèle visible change immédiatement, mais seule la transaction validée fait foi.
       refreshUI();
-      // Snapshot par modification pour garantir l'ordre d'écriture.
       const snapshot = structuredClone(state);
-      saveQueue = saveQueue.catch(() => {}).then(async () => {
+      pendingSaves++;
+      saveQueue = saveQueue.then(async () => {
+        if (externalChangePending) throw new Error('Conflit entre onglets : recharger avant de sauvegarder.');
         if (storageMode === 'indexeddb' && workspaceDb) {
-          await writeWorkspace(workspaceDb, snapshot);
+          workspaceRevision = await writeWorkspace(workspaceDb, snapshot, workspaceRevision);
+          syncChannel?.postMessage({type:'committed', workspaceId:WORKSPACE_ID,
+            sender:syncOrigin, revision:workspaceRevision});
         } else if (storageMode === 'fallback') {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
         } else {
           throw new Error('Stockage non initialisé');
         }
         showSaveIndicator();
-      }).catch(showStorageProblem);
+      }).catch(error => {
+        externalChangePending = true;
+        showRemoteChangeNotice();
+        showStorageProblem(error);
+      }).finally(() => {
+        pendingSaves--;
+        if (externalChangePending && !pendingSaves && !editorIsOpen())
+          showRemoteChangeNotice(); // L'utilisateur doit décider comment résoudre le conflit.
+      });
     }
 
     function showSaveIndicator() {
@@ -13838,6 +13942,7 @@ body > main {flex:1 1 auto;min-height:0;position:relative;overflow:hidden;}
     // ------------------------------------------------------------------
     document.addEventListener("DOMContentLoaded", async () => {
       await loadState();
+      if (storageMode === 'indexeddb') setupWorkspaceSync();
 
       // Navigation Tabs
       document.querySelectorAll(".tab-btn").forEach(btn => {
@@ -13921,6 +14026,10 @@ body > main {flex:1 1 auto;min-height:0;position:relative;overflow:hidden;}
       // Modal Form Submit Handler
       document.getElementById("form-entity").addEventListener("submit", (e) => {
         e.preventDefault();
+        if (externalChangePending) {
+          alert('Modifications externes détectées : annulez ce formulaire et rechargez la page avant de sauvegarder.');
+          return;
+        }
         const isEdit = document.getElementById("input-is-edit").value === "true";
         const type = document.getElementById("input-type").value;
         const id = document.getElementById("input-id").value;
