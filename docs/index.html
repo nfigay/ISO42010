@@ -13949,7 +13949,13 @@ body > main {flex:1 1 auto;min-height:0;position:relative;overflow:hidden;}
             state.correspondences.push({ id, name, sourceElementRef: src, targetElementRef: tgt, relationType: "relates" });
           }
         } else {
-          if (type === "ArchitectureView") {
+          if (type === "Stakeholder") {
+            const stakeholder = state.stakeholders.find(s => s.id === id);
+            if (stakeholder) {
+              stakeholder.name = name;
+              stakeholder.role = desc;
+            }
+          } else if (type === "ArchitectureView") {
             const view = state.views.find(v => v.id === id);
             if (view) {
               view.name = name;
