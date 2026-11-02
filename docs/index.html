@@ -13350,6 +13350,9 @@ body > main {flex:1 1 auto;min-height:0;position:relative;overflow:hidden;}
     let pendingSaves = 0;
     let externalChangePending = false;
     let syncChannel = null;
+    let syncBus = null;
+    let syncMakeEvent = null;
+    let syncLegacyUnsubscribe = null;
     let reconcileRunning = false;
     const syncOrigin = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random();
 
@@ -13405,14 +13408,24 @@ body > main {flex:1 1 auto;min-height:0;position:relative;overflow:hidden;}
       }
     }
 
-    function setupWorkspaceSync() {
+    async function setupWorkspaceSync() {
       if (typeof BroadcastChannel !== 'undefined') {
-        syncChannel = new BroadcastChannel('ISO42010_Workspace_Sync_v1');
-        syncChannel.onmessage = event => {
-          const msg = event.data;
-          if (msg?.workspaceId === WORKSPACE_ID && msg?.sender !== syncOrigin && msg?.type === 'committed')
+        // Les modules sont servis depuis docs/modules; le canal reste identique.
+        const [{makeWorkspaceUpdated}, {createEventBus}, {createBroadcastChannelTransport}] = await Promise.all([
+          import('./modules/events/event-contract.js'),
+          import('./modules/events/event-bus.js'),
+          import('./modules/transports/broadcast-channel-transport.js')
+        ]);
+        const transport = createBroadcastChannelTransport();
+        syncChannel = transport;
+        syncBus = createEventBus({transport, workspaceId:WORKSPACE_ID, sender:syncOrigin});
+        syncMakeEvent = makeWorkspaceUpdated;
+        syncBus.subscribe(() => { void reconcileWorkspace(); });
+        // Compatibilité ascendante: les anciens onglets emettent 'committed'.
+        syncLegacyUnsubscribe = transport.subscribe(msg => {
+          if (msg?.type === 'committed' && msg.workspaceId === WORKSPACE_ID && msg.sender !== syncOrigin)
             void reconcileWorkspace();
-        };
+        });
       }
       // Rattrape une notification manquée (onglet suspendu ou navigateur sans BroadcastChannel).
       window.addEventListener('focus', () => { void reconcileWorkspace(); });
@@ -13565,8 +13578,14 @@ body > main {flex:1 1 auto;min-height:0;position:relative;overflow:hidden;}
         if (externalChangePending) throw new Error('Conflit entre onglets : recharger avant de sauvegarder.');
         if (storageMode === 'indexeddb' && workspaceDb) {
           workspaceRevision = await writeWorkspace(workspaceDb, snapshot, workspaceRevision);
-          syncChannel?.postMessage({type:'committed', workspaceId:WORKSPACE_ID,
-            sender:syncOrigin, revision:workspaceRevision});
+          if (syncBus && syncMakeEvent) {
+            syncBus.publishCommitted(syncMakeEvent({workspaceId:WORKSPACE_ID,
+              sender:syncOrigin, revision:workspaceRevision,
+              eventId:syncOrigin + ':' + workspaceRevision}));
+            // Notification pour les onglets encore sur le protocole historique.
+            syncChannel.publish({type:'committed', workspaceId:WORKSPACE_ID,
+              sender:syncOrigin, revision:workspaceRevision});
+          }
         } else if (storageMode === 'fallback') {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
         } else {
@@ -13942,7 +13961,10 @@ body > main {flex:1 1 auto;min-height:0;position:relative;overflow:hidden;}
     // ------------------------------------------------------------------
     document.addEventListener("DOMContentLoaded", async () => {
       await loadState();
-      if (storageMode === 'indexeddb') setupWorkspaceSync();
+      if (storageMode === 'indexeddb') {
+        try { await setupWorkspaceSync(); }
+        catch (error) { console.error('[ISO42010 sync] Modules indisponibles; synchronisation des onglets desactivee', error); }
+      }
 
       // Navigation Tabs
       document.querySelectorAll(".tab-btn").forEach(btn => {
