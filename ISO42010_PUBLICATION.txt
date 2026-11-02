@@ -1,0 +1,5 @@
+ISO42010 local Vite publication
+source_commit=0dbe8ec513dace8abe009626c6818dac551d46de
+source_branch=main
+build_targets=standalone,server,modules,pages
+publication_root=dist/publication
