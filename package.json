@@ -3,6 +3,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "dev": "vite",
+    "build:standalone": "vite build --mode standalone",
+    "build:server": "vite build --mode server",
+    "build:modules": "vite build --mode modules",
+    "build:pages": "vite build --mode pages",
+    "build": "node scripts/build-targets.mjs",
+    "preview": "vite preview --mode server --host 127.0.0.1 --port 4173 --strictPort"
+  },
+  "devDependencies": {
+    "vite": "^8.2.2",
+    "vite-plugin-singlefile": "^2.3.3"
   }
 }
