@@ -1,0 +1,133 @@
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://iso.org/iso-iec-ieee-42010/network"
+           xmlns:iso="http://iso.org/iso-iec-ieee-42010/network"
+           elementFormDefault="qualified">
+
+  <!-- Élément de base universel (ADElement) -->
+  <xs:complexType name="tADElement" abstract="true">
+    <xs:attribute name="id" type="xs:ID" use="required"/>
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="description" type="xs:string" use="optional"/>
+  </xs:complexType>
+
+  <!-- RACINE DU CONTENEUR GLOBAL -->
+  <xs:element name="architectureDescription" type="iso:tArchitectureDescription"/>
+  
+  <xs:complexType name="tArchitectureDescription">
+    <xs:sequence>
+      <xs:element name="systemOfInterest" type="iso:tSystemOfInterest"/>
+      <xs:element name="stakeholders" type="iso:tStakeholder" maxOccurs="unbounded"/>
+      <xs:element name="concerns" type="iso:tConcern" maxOccurs="unbounded"/>
+      <xs:element name="viewpoints" type="iso:tArchitectureViewpoint" maxOccurs="unbounded"/>
+      <xs:element name="modelKinds" type="iso:tModelKind" maxOccurs="unbounded"/>
+      <xs:element name="models" type="iso:tArchitectureModel" maxOccurs="unbounded"/>
+      <xs:element name="views" type="iso:tArchitectureView" maxOccurs="unbounded"/>
+      <xs:element name="rationales" type="iso:tArchitectureRationale" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="correspondenceRules" type="iso:tCorrespondenceRule" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="correspondences" type="iso:tCorrespondence" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="id" type="xs:ID" use="required"/>
+    <xs:attribute name="name" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <!-- 1. System of Interest & Environment -->
+  <xs:complexType name="tSystemOfInterest">
+    <xs:complexContent>
+      <xs:extension base="iso:tADElement">
+        <xs:sequence>
+          <xs:element name="environmentDescription" type="xs:string"/>
+          <xs:element name="mission" type="xs:string" maxOccurs="unbounded"/>
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- 2. Stakeholder -->
+  <xs:complexType name="tStakeholder">
+    <xs:complexContent>
+      <xs:extension base="iso:tADElement">
+        <xs:attribute name="role" type="xs:string" use="required"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- 3. Concern (Held by Stakeholders: 1..* relation via IDREFS) -->
+  <xs:complexType name="tConcern">
+    <xs:complexContent>
+      <xs:extension base="iso:tADElement">
+        <xs:attribute name="holderStakeholderRefs" type="xs:IDREFS" use="required"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- 4. Model Kind (Conventions, notations, languages like BPMN 2.0) -->
+  <xs:complexType name="tModelKind">
+    <xs:complexContent>
+      <xs:extension base="iso:tADElement">
+        <xs:attribute name="governingNotation" type="xs:string" use="required"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- 5. Architecture Viewpoint (Frames Concerns, Governed/Uses Model Kinds) -->
+  <xs:complexType name="tArchitectureViewpoint">
+    <xs:complexContent>
+      <xs:extension base="iso:tADElement">
+        <xs:attribute name="framedConcernRefs" type="xs:IDREFS" use="required"/>
+        <xs:attribute name="usedModelKindRefs" type="xs:IDREFS" use="required"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- 6. Architecture Model (Governed by a Model Kind) -->
+  <xs:complexType name="tArchitectureModel">
+    <xs:complexContent>
+      <xs:extension base="iso:tADElement">
+        <xs:attribute name="governedByModelKindRef" type="xs:IDREF" use="required"/>
+        <xs:attribute name="artifactURI" type="xs:anyURI" use="optional"/> <!-- Lien vers le fichier .bpmn ou ID Sparx EA -->
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- 7. Architecture View (Governed by Viewpoint, consists of Models: 1..* via IDREFS) -->
+  <xs:complexType name="tArchitectureView">
+    <xs:complexContent>
+      <xs:extension base="iso:tADElement">
+        <xs:attribute name="governedByViewpointRef" type="xs:IDREF" use="required"/>
+        <xs:attribute name="containedModelRefs" type="xs:IDREFS" use="required"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- 8. Architecture Rationale -->
+  <xs:complexType name="tArchitectureRationale">
+    <xs:complexContent>
+      <xs:extension base="iso:tADElement">
+        <xs:attribute name="addressedConcernRefs" type="xs:IDREFS" use="required"/>
+        <xs:attribute name="justificationText" type="xs:string" use="required"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- 9. Correspondence Rule -->
+  <xs:complexType name="tCorrespondenceRule">
+    <xs:complexContent>
+      <xs:extension base="iso:tADElement">
+        <xs:attribute name="constraintExpression" type="xs:string" use="required"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- 10. Correspondence (Relates ANY AD Element to ANY AD Element, optionally governed by a Rule) -->
+  <xs:complexType name="tCorrespondence">
+    <xs:complexContent>
+      <xs:extension base="iso:tADElement">
+        <xs:attribute name="sourceElementRef" type="xs:IDREF" use="required"/>
+        <xs:attribute name="targetElementRef" type="xs:IDREF" use="required"/>
+        <xs:attribute name="governedByRuleRef" type="xs:IDREF" use="optional"/>
+        <xs:attribute name="relationType" type="xs:string" use="required"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+</xs:schema>

@@ -1,0 +1,20 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<iso:architectureDescription xmlns:iso="http://iso.org/iso-iec-ieee-42010/network" id="AD_PAYMENT_PLATFORM" name="Payment Platform Architecture Description">
+  <iso:systemOfInterest id="SOI_PAYMENT_SYS" name="Enterprise Payment Platform">
+    <iso:environmentDescription>Hybrid Cloud Microservices</iso:environmentDescription>
+    <iso:mission>PCI-DSS Compliant Payment Settlement Processing</iso:mission>
+  </iso:systemOfInterest>
+  <iso:stakeholders id="STK_CISO" name="Chief Information Security Officer" role="Security &amp; Compliance"/>
+  <iso:stakeholders id="STK_OPS" name="Operations Director" role="Business Operations"/>
+  <iso:concerns id="CON_PCI" name="PCI-DSS Data Protection" holderStakeholderRefs="STK_CISO"/>
+  <iso:concerns id="CON_LATENCY" name="Transaction Execution Latency" holderStakeholderRefs="STK_OPS"/>
+  <iso:viewpoints id="VP_SEC" name="Security &amp; Risk Viewpoint" framedConcernRefs="CON_PCI" usedModelKindRefs="MK_BPMN20"/>
+  <iso:viewpoints id="VP_OPS" name="Operational Workflow Viewpoint" framedConcernRefs="CON_LATENCY" usedModelKindRefs="MK_BPMN20"/>
+  <iso:modelKinds id="MK_BPMN20" name="BPMN 2.0 Process Notation" governingNotation="OMG BPMN 2.0 XML Schema"/>
+  <iso:models id="MOD_PAYMENT" name="Payment Settlement Process" governedByModelKindRef="MK_BPMN20" artifactURI="process_payment_v2.bpmn"/>
+  <iso:models id="MOD_AUDIT" name="Audit Trail Sub-process" governedByModelKindRef="MK_BPMN20" artifactURI="subprocess_audit.bpmn"/>
+  <iso:views id="VIEW_SEC" name="Security Compliance View" governedByViewpointRef="VP_SEC" containedModelRefs="MOD_AUDIT"/>
+  <iso:views id="VIEW_OPS" name="Operational Workflow View" governedByViewpointRef="VP_OPS" containedModelRefs="MOD_PAYMENT MOD_AUDIT"/>
+  <iso:correspondences id="CORR_01" name="Process Invocation Link" sourceElementRef="MOD_PAYMENT" targetElementRef="MOD_AUDIT" relationType="invokesCallActivity"/>
+  <iso:correspondences id="CORR_02" name="Compliance Satisfaction" sourceElementRef="MOD_AUDIT" targetElementRef="CON_PCI" relationType="satisfies"/>
+</iso:architectureDescription>

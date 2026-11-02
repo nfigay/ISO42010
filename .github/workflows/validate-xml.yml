@@ -1,0 +1,21 @@
+name: Validate XML baseline
+on:
+  push:
+    paths:
+      - 'schemas/**'
+      - 'examples/**'
+      - 'tests/**'
+      - '.github/workflows/validate-xml.yml'
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XML validator on runner
+        run: sudo apt-get update && sudo apt-get install -y libxml2-utils
+      - name: Validate XSD and XML fixtures
+        run: bash tests/validate_xml.sh

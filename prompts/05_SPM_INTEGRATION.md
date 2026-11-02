@@ -1,0 +1,3 @@
+# Prompt — Préparer l'intégration du paquet de médiation dans SPM
+
+Avec le paquet de médiation exporté par ISO42010 et le code actuel de Semantic Process Mediator fourni, établir les points d'intégration **réels** : schémas et namespaces, `bpmn:extensionElements`, descripteurs bpmn-moddle, résolution des références, versions, interprétation palette/forms/filters/renderers/lint. Ne pas réimplémenter les objets du BPMN Core. Dresser matrice de correspondance, tests import/export et protocole de déploiement non régressif. Ne pas inventer les dépendances ni les mécanismes de SPM sans examiner ses sources.

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<iso:architectureDescription xmlns:iso="http://iso.org/iso-iec-ieee-42010/network" id="SOI_PAYMENT_SYS" name="Enterprise Payment Platform">
+  <iso:systemOfInterest id="SOI_PAYMENT_SYS" name="Enterprise Payment Platform"><iso:environmentDescription>Hybrid Cloud Microservices</iso:environmentDescription><iso:mission>PCI-DSS Compliant Payment Settlement Processing</iso:mission></iso:systemOfInterest>
+  <iso:stakeholder id="STK_CISO" name="Chief Information Security Officer" role="Security &amp; Compliance" />
+  <iso:stakeholder id="STK_OPS" name="Operations Director" role="Business Operations" />
+  <iso:concern id="CON_PCI" name="PCI-DSS Data Protection" holderStakeholderRefs="STK_CISO" />
+  <iso:concern id="CON_LATENCY" name="Transaction Execution Latency" holderStakeholderRefs="STK_OPS" />
+  <iso:architectureViewpoint id="VP_SEC" name="Security &amp; Risk Viewpoint" framedConcernRefs="CON_PCI" />
+  <iso:architectureViewpoint id="VP_OPS" name="Operational Workflow Viewpoint" framedConcernRefs="CON_LATENCY" />
+  <iso:architectureView id="VIEW_SEC" name="Security Compliance View" governedByViewpointRef="VP_SEC" containedModelRefs="MOD_AUDIT" />
+  <iso:architectureView id="VIEW_OPS" name="Operational Workflow View" governedByViewpointRef="VP_OPS" containedModelRefs="MOD_PAYMENT MOD_AUDIT" />
+  <iso:architectureModel id="MOD_PAYMENT" name="Payment Settlement Process" governedByModelKindRef="MK_BPMN20" artifactURI="process_payment_v2.bpmn" />
+  <iso:architectureModel id="MOD_AUDIT" name="Audit Trail Sub-process" governedByModelKindRef="MK_BPMN20" artifactURI="subprocess_audit.bpmn" />
+  <iso:correspondence id="CORR_01" name="Process Invocation Link" sourceElementRef="MOD_PAYMENT" targetElementRef="MOD_AUDIT" relationType="invokesCallActivity" />
+  <iso:correspondence id="CORR_02" name="Compliance Satisfaction" sourceElementRef="MOD_AUDIT" targetElementRef="CON_PCI" relationType="satisfies" />
+</iso:architectureDescription>

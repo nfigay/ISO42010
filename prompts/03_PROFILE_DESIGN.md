@@ -1,0 +1,3 @@
+# Prompt — Concevoir un profil de médiation ISO42010 → SPM
+
+À partir de `architecture/OBJECTIFS_ET_FRONTIERES.md`, `architecture/MODELE_MEDIATION_CIBLE.md` et du XSD baseline, conçois un **profil de médiation** pour le viewpoint suivant : [viewpoint, stakeholders, concerns]. Définis : composition d'artefacts BPMN (y compris objets sans représentation graphique), groupes de données, palette, data forms, filtres, rendu/labels, mappings composites, règles de validation et résultats attendus. Réutilise les concepts BPMN Core ; n'ajoute des types SPM que pour les besoins non couverts. Distingue standard, extension SPM et choix à valider. Ne modifie pas encore le code SPM.
